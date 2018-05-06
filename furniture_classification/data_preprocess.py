@@ -17,38 +17,37 @@ import utils
 
 data_dir = './'
 train_dir = 'train_ds'
-test_dir = 'valid_ds'
+test_dir = 'test_ds'
 
 label_file = 'trainLabels.csv'
 input_dir = 'train_valid_test'
 
-valid_ratio = 0.1
-batch_size = 128
+batch_size = 64
 
 
 def transform_train(data, label):
-    im = data.astype('float32') / 255
-    auglist = image.CreateAugmenter(data_shape=(3, 112, 112), resize=0,
-                                    rand_crop=False, rand_resize=False, rand_mirror=True,
-                                    mean=np.array([0.4914, 0.4822, 0.4465]),
-                                    std=np.array([0.2023, 0.1994, 0.2010]),
-                                    brightness=0, contrast=0,
-                                    saturation=0, hue=0,
-                                    pca_noise=0, rand_gray=0, inter_method=2)
-    for aug in auglist:
-        im = aug(im)
+    im = data.astype('float32') / 255 - 0.5
+    # auglist = image.CreateAugmenter(data_shape=(3, 224, 224), resize=0,
+    #                                 rand_crop=False, rand_resize=False, rand_mirror=True,
+    #                                 brightness=0, contrast=0,
+    #                                 saturation=0, hue=0,
+    #                                 pca_noise=0, rand_gray=0, inter_method=2)
+    # for aug in auglist:
+    #     im = aug(im)
     # 将数据格式从"高*宽*通道"改为"通道*高*宽"。
     im = nd.transpose(im, (2, 0, 1))
     return im, nd.array([label]).asscalar().astype('float32')
 
 
 def transform_test(data, label):
-    im = data.astype('float32') / 255
-    auglist = image.CreateAugmenter(data_shape=(1, 112, 112),
-                                    mean=np.array([0.4914, 0.4822, 0.4465]),
-                                    std=np.array([0.2023, 0.1994, 0.2010]))
-    for aug in auglist:
-        im = aug(im)
+    im = data.astype('float32') / 255 - 0.5
+    # auglist = image.CreateAugmenter(data_shape=(3, 224, 224), resize=0,
+    #                                 rand_crop=False, rand_resize=False, rand_mirror=True,
+    #                                 brightness=0, contrast=0,
+    #                                 saturation=0, hue=0,
+    #                                 pca_noise=0, rand_gray=0, inter_method=2)
+    # for aug in auglist:
+    #     im = aug(im)
     im = nd.transpose(im, (2, 0, 1))
     return im, nd.array([label]).asscalar().astype('float32')
 
@@ -60,16 +59,10 @@ train_ds = vision.ImageFolderDataset(input_str + train_dir, flag=1,
                                      transform=transform_train)
 valid_ds = vision.ImageFolderDataset(input_str + test_dir, flag=1,
                                      transform=transform_test)
-# train_valid_ds = vision.ImageFolderDataset(input_str + 'train_valid',
-#                                            flag=1, transform=transform_train)
-# test_ds = vision.ImageFolderDataset(input_str + 'test', flag=1,
-#                                     transform=transform_test)
 
 loader = gluon.data.DataLoader
-train_data = loader(train_ds, batch_size, shuffle=True, last_batch='keep')
-valid_data = loader(valid_ds, batch_size, shuffle=True, last_batch='keep')
-# train_valid_data = loader(train_valid_ds, batch_size, shuffle=True, last_batch='keep')
-# test_data = loader(test_ds, batch_size, shuffle=False, last_batch='keep')
+train_data = loader(train_ds, batch_size, shuffle=True, last_batch='keep', num_workers=6)
+valid_data = loader(valid_ds, batch_size, shuffle=True, last_batch='keep', num_workers=6)
 
 # 交叉熵损失函数。
 softmax_cross_entropy = gluon.loss.SoftmaxCrossEntropyLoss()
@@ -104,25 +97,33 @@ class ResNet(nn.HybridBlock):
         self.verbose = verbose
         with self.name_scope():
             net = self.net = nn.HybridSequential()
-            # 模块1
-            net.add(nn.Conv2D(channels=32, kernel_size=3, strides=1, padding=1))
-            net.add(nn.BatchNorm())
-            net.add(nn.Activation(activation='relu'))
-            # 模块2
-            for _ in range(3):
-                net.add(Residual(channels=32))
-            # 模块3
-            net.add(Residual(channels=64, same_shape=False))
-            for _ in range(3):
-                net.add(Residual(channels=64))
-            # 模块4
-            net.add(Residual(channels=128, same_shape=False))
-            for _ in range(3):
-                net.add(Residual(channels=128))
-            # 模块5
-            net.add(nn.AvgPool2D(pool_size=8))
-            net.add(nn.Flatten())
-            net.add(nn.Dense(num_classes))
+            net.add(
+                # 第一阶段
+                nn.Conv2D(channels=96, kernel_size=11,
+                          strides=4, activation='relu'),
+                nn.MaxPool2D(pool_size=3, strides=2),
+                # 第二阶段
+                nn.Conv2D(channels=256, kernel_size=5,
+                          padding=2, activation='relu'),
+                nn.MaxPool2D(pool_size=3, strides=2),
+                # 第三阶段
+                nn.Conv2D(channels=384, kernel_size=3,
+                          padding=1, activation='relu'),
+                nn.Conv2D(channels=384, kernel_size=3,
+                          padding=1, activation='relu'),
+                nn.Conv2D(channels=256, kernel_size=3,
+                          padding=1, activation='relu'),
+                nn.MaxPool2D(pool_size=3, strides=2),
+                # 第四阶段
+                nn.Flatten(),
+                nn.Dense(4096, activation="relu"),
+                nn.Dropout(.5),
+                # 第五阶段
+                nn.Dense(4096, activation="relu"),
+                nn.Dropout(.5),
+                # 第六阶段
+                nn.Dense(num_classes)
+            )
 
     def hybrid_forward(self, F, x):
         out = x
@@ -134,7 +135,7 @@ class ResNet(nn.HybridBlock):
 
 
 def get_net(ctx):
-    num_outputs = 10
+    num_outputs = 128
     net = ResNet(num_outputs)
     net.initialize(ctx=ctx, init=init.Xavier())
     return net
@@ -142,7 +143,7 @@ def get_net(ctx):
 
 def train(net, train_data, valid_data, num_epochs, lr, wd, ctx, lr_period, lr_decay):
     trainer = gluon.Trainer(
-        net.collect_params(), 'sgd', {'learning_rate': lr, 'momentum': 0.9, 'wd': wd})
+        net.collect_params(), 'sgd', {'learning_rate': lr, 'momentum': 0.95, 'wd': wd})
 
     prev_time = datetime.datetime.now()
     for epoch in range(num_epochs):
@@ -179,13 +180,12 @@ def train(net, train_data, valid_data, num_epochs, lr, wd, ctx, lr_period, lr_de
 
 
 ctx = mx.gpu()
-num_epochs = 100
+num_epochs = 10000
 learning_rate = 0.01
 weight_decay = 5e-4
-lr_period = 100
+lr_period = 3
 lr_decay = 0.1
 
 net = get_net(ctx)
 net.hybridize()
-train(net,valid_data, train_data, num_epochs, learning_rate,
-      weight_decay, ctx, lr_period, lr_decay)
+train(net, train_data, valid_data, num_epochs, learning_rate, weight_decay, ctx, lr_period, lr_decay)

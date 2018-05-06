@@ -69,13 +69,7 @@ def reorg_cifar10_data(data_dir, label_file, train_dir, test_dir, input_dir, val
 
 def transform_train(data, label):
     im = data.astype('float32') / 255
-    auglist = image.CreateAugmenter(data_shape=(3, 32, 32), resize=0,
-                                    rand_crop=True, rand_resize=True, rand_mirror=True,
-                                    mean=np.array([0.4914, 0.4822, 0.4465]),
-                                    std=np.array([0.2023, 0.1994, 0.2010]),
-                                    brightness=0, contrast=0,
-                                    saturation=0, hue=0,
-                                    pca_noise=0, rand_gray=0, inter_method=2)
+    auglist = image.CreateAugmenter(data_shape=(3, 32, 32))
     for aug in auglist:
         im = aug(im)
     # 将数据格式从"高*宽*通道"改为"通道*高*宽"。
@@ -85,9 +79,7 @@ def transform_train(data, label):
 
 def transform_test(data, label):
     im = data.astype('float32') / 255
-    auglist = image.CreateAugmenter(data_shape=(3, 32, 32),
-                                    mean=np.array([0.4914, 0.4822, 0.4465]),
-                                    std=np.array([0.2023, 0.1994, 0.2010]))
+    auglist = image.CreateAugmenter(data_shape=(3, 32, 32))
     for aug in auglist:
         im = aug(im)
     im = nd.transpose(im, (2, 0, 1))
@@ -146,19 +138,19 @@ class ResNet(nn.HybridBlock):
         with self.name_scope():
             net = self.net = nn.HybridSequential()
             # 模块1
-            net.add(nn.Conv2D(channels=32, kernel_size=3, strides=1, padding=1))
+            net.add(nn.Conv2D(channels=64, kernel_size=7, strides=1, padding=1))
             net.add(nn.BatchNorm())
             net.add(nn.Activation(activation='relu'))
             # 模块2
-            for _ in range(1):
-                net.add(Residual(channels=32))
+            for _ in range(3):
+                net.add(Residual(channels=128))
             # 模块3
             net.add(Residual(channels=64, same_shape=False))
-            for _ in range(1):
+            for _ in range(3):
                 net.add(Residual(channels=64))
             # 模块4
             net.add(Residual(channels=32, same_shape=False))
-            for _ in range(1):
+            for _ in range(3):
                 net.add(Residual(channels=32))
             # 模块5
             net.add(nn.AvgPool2D(pool_size=2))
@@ -219,10 +211,10 @@ def train(net, train_data, valid_data, num_epochs, lr, wd, ctx, lr_period, lr_de
 
 
 ctx = mx.gpu()
-num_epochs = 1000
-learning_rate = 0.001
+num_epochs = 10000
+learning_rate = 0.01
 weight_decay = 5e-4
-lr_period = 80
+lr_period = 200
 lr_decay = 0.01
 
 net = get_net(ctx)

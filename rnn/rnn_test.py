@@ -1,24 +1,20 @@
+import numpy as np
 import mxnet as mx
-import mxnet.autograd as ag
 
-ctx = mx.cpu()
+h2h_weight = mx.nd.array([[0.1, 0.2], [0.3, 0.4]], dtype=np.float32)
+h2h_bias = mx.nd.array([0.1, -0.1], dtype=np.float32)
 
-input = mx.nd.ones(shape=(10, 50))
+i2h_weight = mx.nd.array([[0.5, 0.6]])
 
-xh = mx.nd.random_normal(0, 0.01, shape=(50, 100), ctx=ctx)
-hh = mx.nd.random_normal(0, 0.01, shape=(100, 100), ctx=ctx)
-hy = mx.nd.random_normal(0, 0.01, shape=(100, 10), ctx=ctx)
+X = mx.nd.array([[1.0], [2.0]])
 
-params = [xh, hh, hy]
+state = mx.nd.array([0.0, 0.0])
 
-for param in params:
-    param.attach_grad()
+h2o_weight = mx.nd.array([1.0, 2.0], dtype=np.float32)
+h2o_bias = mx.nd.array([0.1])
 
-h = mx.nd.dot(input, xh)
-outputs = []
-for idx in range(input.shape[0]):
-    output = mx.nd.relu(mx.nd.dot(input[idx, :].reshape([1, 50]), xh))
+for i in range(len(X)):
+    brfore_activation = mx.nd.dot(state, h2h_weight) + X[i] * i2h_weight + h2h_bias
+    state = mx.nd.tanh(brfore_activation)
+    output = mx.nd.dot(state, h2o_weight) + h2o_bias
     print(output)
-output = mx.nd.dot(h, hh)
-yhat = mx.nd.dot(output, hy)
-print(yhat)

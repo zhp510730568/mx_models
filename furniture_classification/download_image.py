@@ -13,8 +13,9 @@ root_path = './data'
 train_file = 'train.json'
 
 data_dir = './'
-train_dir = 'train_ds'
-test_dir = 'valid_ds'
+train_dir = 'valid_ds'
+test_dir = 'train_ds'
+
 
 def downloadimage(url, label, image_id):
     '''
@@ -97,7 +98,6 @@ def downloadtrainset():
 
     for thd in downloadthreads:
         thd.join()
-
 
 
 def reorg_funiture_data(data_dir, label_file, train_dir, test_dir, input_dir, valid_ratio):

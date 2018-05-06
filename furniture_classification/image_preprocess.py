@@ -1,7 +1,5 @@
 import os
 
-import mxnet as mx
-
 import shutil
 import numpy as np
 import cv2 as cv
@@ -9,9 +7,9 @@ import cv2 as cv
 from mxnet.tools import im2rec
 
 root_path = './train_dir/'
-train_ds_path = './train_ds'
+train_ds_path = './valid_ds'
 test_ds_path = './test_ds'
-valid_ds_path = './valid_ds'
+valid_ds_path = './train_ds'
 
 
 def show(label, image_file):
@@ -20,6 +18,7 @@ def show(label, image_file):
 
     cv.imshow(label, image)
     cv.waitKey(0)
+
 
 def makedir(dir):
     if not os.path.exists(dir):
@@ -48,27 +47,64 @@ def split(train_ratio = 0.10):
 
 import mxnet.ndarray._internal as internal
 
-
-os.remove('./valid_ds/116/116_187116.jpg')
-for label_dir in os.listdir(train_ds_path)[0: -1]:
-    print('label: ', label_dir)
-    for image_file in os.listdir(os.path.join(train_ds_path, label_dir)):
-        print(image_file)
-        if image_file.endswith('.jpg') or image_file.endswith('.jpeg') or image_file.endswith('.png'):
+def filterimage():
+    for label_dir in os.listdir(train_ds_path)[0: -1]:
+        print('label: ', label_dir)
+        for image_file in os.listdir(os.path.join(train_ds_path, label_dir)):
             image_path = os.path.join(train_ds_path, label_dir, image_file)
-            try:
-                print(image_path)
-                image_nd = internal._cvimread(image_path, flag=1)
-            except:
+            if image_file.endswith('.jpg') or image_file.endswith('.jpeg') or image_file.endswith('.png'):
+                try:
+                    print("normal: ", image_path)
+                    image_nd = internal._cvimread(image_path, flag=1)
+                except:
+                    print("err: ", image_path)
+                    os.remove(image_path)
+            else:
+                print("format error: ", image_path)
                 os.remove(image_path)
 
-for label_dir in os.listdir('./valid_ds'):
-    print('label: ', label_dir)
-    for image_file in os.listdir(os.path.join('./valid_ds', label_dir)):
-        if image_file.endswith('.jpg') or image_file.endswith('.jpeg') or image_file.endswith('.png'):
-            image_path = os.path.join('./valid_ds', label_dir, image_file)
-            try:
-                print(image_path)
-                image_nd = internal._cvimread(image_path, flag=1)
-            except:
+    for label_dir in os.listdir('./train_ds'):
+        print('label: ', label_dir)
+        for image_file in os.listdir(os.path.join('./train_ds', label_dir)):
+            image_path = os.path.join('./train_ds', label_dir, image_file)
+            if image_file.endswith('.jpg') or image_file.endswith('.jpeg') or image_file.endswith('.png'):
+                try:
+                    print("normal: ", image_path)
+                    image_nd = internal._cvimread(image_path, flag=1)
+                except:
+                    print("err: ", image_path)
+                    os.remove(image_path)
+            else:
+                print("format error: ", image_path)
+                os.remove(image_path)
+
+def moveimage(fraction=0.5):
+    for label_dir in os.listdir(train_ds_path)[0: -1]:
+        print('label: ', label_dir)
+        for image_file in os.listdir(os.path.join(train_ds_path, label_dir)):
+            image_path = os.path.join(train_ds_path, label_dir, image_file)
+            if image_file.endswith('.jpg') or image_file.endswith('.jpeg') or image_file.endswith('.png'):
+                try:
+                    print("normal: ", image_path)
+                    image_nd = internal._cvimread(image_path, flag=1)
+                except:
+                    print("err: ", image_path)
+                    os.remove(image_path)
+            else:
+                print("format error: ", image_path)
+                os.remove(image_path)
+
+    for label_dir in os.listdir('./train_ds'):
+        print('label: ', label_dir)
+        for image_file in os.listdir(os.path.join('./train_ds', label_dir)):
+            image_path = os.path.join('./train_ds', label_dir, image_file)
+            if image_file.endswith('.jpg') or image_file.endswith('.jpeg') or image_file.endswith('.png'):
+                try:
+                    print("normal: ", image_path)
+                    image_nd = internal._cvimread(image_path, flag=1)
+                except:
+                    print("err: ", image_path)
+                    os.remove(image_path)
+            else:
+                print("format error: ", image_path)
                 os.remove(image_path)
